@@ -1,0 +1,225 @@
+{
+  "name": "Directus Webhook -> YouTube Upload",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "directus-youtube-upload",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "video_url",
+              "value": "={{$json[\"video_url\"]}}"
+            },
+            {
+              "name": "title",
+              "value": "={{$json[\"title\"] || \"Directus Upload\"}}"
+            },
+            {
+              "name": "description",
+              "value": "={{$json[\"description\"] || \"Uploaded from Directus via n8n\"}}"
+            },
+            {
+              "name": "privacyStatus",
+              "value": "={{$json[\"privacyStatus\"] || \"unlisted\"}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "Prepare Metadata",
+      "name": "Prepare Metadata",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/upload/youtube/v3/videos",
+        "method": "POST",
+        "authentication": "oAuth2",
+        "responseFormat": "json",
+        "options": {
+          "fullResponse": true
+        },
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "part",
+              "value": "snippet,status"
+            },
+            {
+              "name": "uploadType",
+              "value": "resumable"
+            }
+          ]
+        },
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "snippet",
+              "value": "={\"title\": $json[\"title\"], \"description\": $json[\"description\"]}"
+            },
+            {
+              "name": "status",
+              "value": "={\"privacyStatus\": $json[\"privacyStatus\"]}"
+            }
+          ]
+        }
+      },
+      "id": "Init Upload",
+      "name": "Init Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        940,
+        300
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "YOUTUBE_OAUTH2",
+          "name": "YouTube OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Init Upload\"].json[\"headers\"][\"location\"]}}",
+        "method": "PUT",
+        "authentication": "none",
+        "sendBinaryData": true,
+        "binaryPropertyName": "video",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "Upload Media",
+      "name": "Upload Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1410,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$json[\"video_url\"]}}",
+        "method": "GET",
+        "responseFormat": "file",
+        "dataPropertyName": "video",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "Download Video",
+      "name": "Download Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        690,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "Merge Upload Data",
+      "name": "Merge Upload Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1190,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Metadata": {
+      "main": [
+        [
+          {
+            "node": "Download Video",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Init Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video": {
+      "main": [
+        [
+          {
+            "node": "Merge Upload Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Init Upload": {
+      "main": [
+        [
+          {
+            "node": "Merge Upload Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Upload Data": {
+      "main": [
+        [
+          {
+            "node": "Upload Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "id": "directus-youtube-upload"
+}
